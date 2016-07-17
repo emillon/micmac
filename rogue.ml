@@ -45,6 +45,10 @@ let parse_action = function
   | 'j' -> `Move ( 0, +1)
   | 'k' -> `Move ( 0, -1)
   | 'l' -> `Move (+1,  0)
+  | 'y' -> `Move (-1, -1)
+  | 'u' -> `Move (+1, -1)
+  | 'b' -> `Move (-1, +1)
+  | 'n' -> `Move (+1, +1)
   | c -> `Invalid c
 
 let rec lwt_forever state f =
