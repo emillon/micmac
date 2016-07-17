@@ -51,15 +51,16 @@ let rec lwt_forever state f =
   let%lwt new_state = f state in
   lwt_forever new_state f
 
-type actor =
+type 'state actor =
   { id : int
   ; pos : int * int
   ; obj : obj
+  ; action : 'state -> 'state Lwt.t
   }
 
 type state =
   { matrix : obj Matrix.t
-  ; actors : actor list
+  ; actors : state actor list
   }
 
 let add_delta (x, y) (dx, dy) = (x+dx, y+dy)
@@ -187,23 +188,29 @@ let set_unbuffered () =
 let fresh () =
   Oo.id (object end)
 
+let player_action state =
+  let%lwt in_c = Lwt_io.read_char Lwt_io.stdin in
+  let%lwt new_state = interpret_action state @@ parse_action in_c in
+  Lwt.return new_state
+
+let noop_action state =
+  Lwt.return state
+
 let main () =
   let init_state =
     { matrix = level
     ; actors =
-      [ { id = fresh () ; pos = (5, 5) ; obj = Player }
-      ; { id = fresh () ; pos = (3, 5) ; obj = Rat }
-      ; { id = fresh () ; pos = (3, 7) ; obj = Rat }
-      ; { id = fresh () ; pos = (7, 5) ; obj = Rat }
-      ; { id = fresh () ; pos = (7, 7) ; obj = Rat }
+      [ { id = fresh () ; pos = (5, 5) ; obj = Player ; action = player_action }
+      ; { id = fresh () ; pos = (3, 5) ; obj = Rat ; action = noop_action }
       ]
     }
   in
   set_unbuffered ();
   lwt_forever init_state @@ fun state ->
     display_state state >>
-    let%lwt in_c = Lwt_io.read_char Lwt_io.stdin in
-    let%lwt new_state = interpret_action state @@ parse_action in_c in
-    Lwt.return new_state
+    let go state actor =
+      actor.action state
+    in
+    Lwt_list.fold_left_s go state state.actors
 
 let _ = Lwt_main.run @@ main ()
