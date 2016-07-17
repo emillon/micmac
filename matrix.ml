@@ -30,7 +30,7 @@ let foldi f z m =
   !res
 
 let get m (i, j) =
-  List.nth (List.nth m i) j
+  List.nth (List.nth m j) i
 
 let rec list_make n x =
   match n with

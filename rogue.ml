@@ -55,17 +55,38 @@ type state =
 
 let add_delta (x, y) (dx, dy) = (x+dx, y+dy)
 
+let can_move state pos =
+  match Matrix.get state.matrix pos with
+  | Wall -> false
+  | Nothing -> true
+  | Player -> assert false
+  | Empty -> assert false
+
+let msg fmt =
+  let k s =
+    print_endline s;
+    Lwt.return_unit
+  in
+  Printf.kprintf k fmt
+
 let interpret_action state = function
   | `Invalid c ->
       begin
-        Printf.printf "Invalid command : '%c'\n%!" c;
+        msg "Invalid command : '%c'\n%!" c >>
         Lwt.return state
       end
   | `Move delta ->
-      Lwt.return
-        { state with
-          player_pos = add_delta state.player_pos delta
-        }
+      let player_pos = add_delta state.player_pos delta in
+      if can_move state player_pos then
+        Lwt.return
+          { state with
+            player_pos
+          }
+      else
+        begin
+          msg "bonk" >>
+          Lwt.return state
+        end
 
 let display_state state =
   let matrix_with_player = Matrix.put state.matrix state.player_pos Player in
