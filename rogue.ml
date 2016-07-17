@@ -3,12 +3,14 @@ type obj =
   | Nothing
   | Wall
   | Empty
+  | Rat
 
 let parse_obj = function
   | '@' -> Some Player
   | '.' -> Some Nothing
   | '#' -> Some Wall
   | ' ' -> Some Empty
+  | 'r' -> Some Rat
   | _ -> None
 
 let print_obj = function
@@ -16,6 +18,7 @@ let print_obj = function
   | Nothing -> '.'
   | Wall -> '#'
   | Empty -> ' '
+  | Rat -> 'r'
 
 let level : obj Matrix.t =
   let data = 
@@ -51,16 +54,31 @@ let rec lwt_forever state f =
 type state =
   { player_pos : int * int
   ; matrix : obj Matrix.t
+  ; rat_pos : int * int
   }
 
 let add_delta (x, y) (dx, dy) = (x+dx, y+dy)
 
+let actors state =
+  [ (state.player_pos, Player)
+  ; (state.rat_pos, Rat)
+  ]
+
+let actor_at state pos =
+  List.exists
+    (fun (actor_pos, _) -> pos = actor_pos)
+    (actors state)
+
 let can_move state pos =
-  match Matrix.get state.matrix pos with
-  | Wall -> false
-  | Nothing -> true
-  | Player -> assert false
-  | Empty -> assert false
+  if actor_at state pos then
+    false
+  else
+    match Matrix.get state.matrix pos with
+    | Wall -> false
+    | Nothing -> true
+    | Player -> assert false
+    | Empty -> assert false
+    | Rat -> assert false
 
 let msg fmt =
   let k s =
@@ -88,9 +106,19 @@ let interpret_action state = function
           Lwt.return state
         end
 
+let add_actors =
+  let go m (pos, obj) =
+    Matrix.put m pos obj
+  in
+  List.fold_left go
+
 let display_state state =
-  let matrix_with_player = Matrix.put state.matrix state.player_pos Player in
-  print matrix_with_player;
+  let matrix_with_actors =
+    add_actors
+      state.matrix
+      (actors state)
+  in
+  print matrix_with_actors;
   Lwt.return_unit
 
 let set_unbuffered () =
@@ -104,6 +132,7 @@ let main () =
   let init_state =
     { player_pos = (5, 5)
     ; matrix = level
+    ; rat_pos = (7, 7)
     }
   in
   set_unbuffered ();
