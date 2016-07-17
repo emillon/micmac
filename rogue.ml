@@ -51,28 +51,36 @@ let rec lwt_forever state f =
   let%lwt new_state = f state in
   lwt_forever new_state f
 
+type actor =
+  { id : int
+  ; pos : int * int
+  ; obj : obj
+  }
+
 type state =
-  { player_pos : int * int
-  ; matrix : obj Matrix.t
-  ; rat_pos : int * int
-  ; rat_alive : bool
+  { matrix : obj Matrix.t
+  ; actors : actor list
   }
 
 let add_delta (x, y) (dx, dy) = (x+dx, y+dy)
 
-let actors state =
-  let rat =
-    if state.rat_alive then
-      [(state.rat_pos, Rat)]
-    else
-      []
-  in
-  [(state.player_pos, Player)]@rat
+let rec first_matching p = function
+  | [] -> None
+  | x::xs ->
+    begin
+      match p x with
+      | Some y -> Some y
+      | None -> first_matching p xs
+    end
 
 let actor_at state pos =
-  match List.assoc pos (actors state) with
-  | exception Not_found -> None
-  | actor -> Some actor
+  let p actor =
+    if actor.pos = pos then
+      Some actor
+    else
+      None
+  in
+  first_matching p state.actors
 
 let can_move state pos =
   match actor_at state pos with
@@ -95,6 +103,42 @@ let msg fmt =
   in
   Printf.kprintf k fmt
 
+let rec delete_actor actor_to_delete = function
+  | actor::actors when actor.id = actor_to_delete.id -> actors
+  | actor::actors -> actor::delete_actor actor_to_delete actors
+  | [] -> []
+
+let kill_actor state actor =
+  { state with
+    actors = delete_actor actor state.actors
+  }
+
+let player state =
+  let p actor =
+    if actor.obj = Player then
+      Some actor
+    else
+      None
+  in
+  match first_matching p state.actors with
+  | Some x -> x
+  | None -> assert false
+
+let rec update_one p modify = function
+  | [] -> invalid_arg "update_one"
+  | x::xs when p x -> (modify x)::xs
+  | x::xs -> x::(update_one p modify xs)
+
+
+let update_player_pos state player_pos =
+  let actors =
+    update_one
+      (fun actor -> actor.obj = Player)
+      (fun actor -> { actor with pos = player_pos })
+      state.actors
+  in
+  { state with actors }
+
 let interpret_action state = function
   | `Invalid c ->
       begin
@@ -102,30 +146,25 @@ let interpret_action state = function
         Lwt.return state
       end
   | `Move delta ->
-      let player_pos = add_delta state.player_pos delta in
+      let player = player state in
+      let player_pos = add_delta player.pos delta in
       match can_move state player_pos with
       | `Can_move ->
-          Lwt.return
-            { state with
-              player_pos
-            }
+          Lwt.return @@ update_player_pos state player_pos
       | `Bonk ->
         begin
           msg "bonk" >>
           Lwt.return state
         end
-      | `Fight _ ->
+      | `Fight actor ->
           begin
             msg "The creature could not do anything" >>
-            Lwt.return
-              { state with
-                rat_alive = false
-              }
+            Lwt.return @@ kill_actor state actor
           end
 
 let add_actors =
-  let go m (pos, obj) =
-    Matrix.put m pos obj
+  let go m actor =
+    Matrix.put m actor.pos actor.obj
   in
   List.fold_left go
 
@@ -133,7 +172,7 @@ let display_state state =
   let matrix_with_actors =
     add_actors
       state.matrix
-      (actors state)
+      state.actors
   in
   print matrix_with_actors;
   Lwt.return_unit
@@ -145,12 +184,19 @@ let set_unbuffered () =
   at_exit (fun _ -> tcsetattr stdin TCSAFLUSH terminfo);
   tcsetattr stdin TCSAFLUSH newterminfo
 
+let fresh () =
+  Oo.id (object end)
+
 let main () =
   let init_state =
-    { player_pos = (5, 5)
-    ; matrix = level
-    ; rat_pos = (7, 7)
-    ; rat_alive = true
+    { matrix = level
+    ; actors =
+      [ { id = fresh () ; pos = (5, 5) ; obj = Player }
+      ; { id = fresh () ; pos = (3, 5) ; obj = Rat }
+      ; { id = fresh () ; pos = (3, 7) ; obj = Rat }
+      ; { id = fresh () ; pos = (7, 5) ; obj = Rat }
+      ; { id = fresh () ; pos = (7, 7) ; obj = Rat }
+      ]
     }
   in
   set_unbuffered ();
