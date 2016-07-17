@@ -21,7 +21,7 @@ let print_obj = function
   | Rat -> 'r'
 
 let level : obj Matrix.t =
-  let data = 
+  let data =
     [ "####             "
     ; "#..#             "
     ; "#..#             "
@@ -55,7 +55,7 @@ type 'state actor =
   { id : int
   ; pos : int * int
   ; obj : obj
-  ; action : 'state -> 'state Lwt.t
+  ; action : 'state actor -> 'state -> 'state Lwt.t
   }
 
 type state =
@@ -131,11 +131,11 @@ let rec update_one p modify = function
   | x::xs -> x::(update_one p modify xs)
 
 
-let update_player_pos state player_pos =
+let update_actor_pos state actor_to_update new_pos =
   let actors =
     update_one
-      (fun actor -> actor.obj = Player)
-      (fun actor -> { actor with pos = player_pos })
+      (fun actor -> actor.id = actor_to_update.id)
+      (fun actor -> { actor with pos = new_pos })
       state.actors
   in
   { state with actors }
@@ -151,7 +151,7 @@ let interpret_action state = function
       let player_pos = add_delta player.pos delta in
       match can_move state player_pos with
       | `Can_move ->
-          Lwt.return @@ update_player_pos state player_pos
+          Lwt.return @@ update_actor_pos state player player_pos
       | `Bonk ->
         begin
           msg "bonk" >>
@@ -188,20 +188,41 @@ let set_unbuffered () =
 let fresh () =
   Oo.id (object end)
 
-let player_action state =
+let player_action _actor state =
   let%lwt in_c = Lwt_io.read_char Lwt_io.stdin in
   let%lwt new_state = interpret_action state @@ parse_action in_c in
   Lwt.return new_state
 
-let noop_action state =
-  Lwt.return state
+let rat_action actor state =
+  let delta =
+    match Random.int 4 with
+    | 0 -> ( 0, -1)
+    | 1 -> ( 0, +1)
+    | 2 -> (-1,  0)
+    | _ -> (+1,  0)
+  in
+  let new_pos = add_delta actor.pos delta in
+  match can_move state new_pos with
+  | `Can_move -> Lwt.return @@ update_actor_pos state actor new_pos
+  | `Bonk -> Lwt.return state
+  | `Fight _ -> Lwt.return state
+
+let rat pos =
+  { id = fresh ()
+  ; pos
+  ; obj = Rat
+  ; action = rat_action
+  }
+
 
 let main () =
   let init_state =
     { matrix = level
     ; actors =
       [ { id = fresh () ; pos = (5, 5) ; obj = Player ; action = player_action }
-      ; { id = fresh () ; pos = (3, 5) ; obj = Rat ; action = noop_action }
+      ; rat (3, 5)
+      ; rat (7, 7)
+      ; rat (5, 7)
       ]
     }
   in
@@ -209,7 +230,7 @@ let main () =
   lwt_forever init_state @@ fun state ->
     display_state state >>
     let go state actor =
-      actor.action state
+      actor.action actor state
     in
     Lwt_list.fold_left_s go state state.actors
 
