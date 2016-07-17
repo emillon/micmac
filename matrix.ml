@@ -11,13 +11,13 @@ let rec list_alter l i f =
   | [], _ -> invalid_arg "list_alter"
 
 let put m (i, j) x =
-  list_alter m i @@ fun row ->
-  list_alter row j @@ fun _ ->
+  list_alter m j @@ fun row ->
+  list_alter row i @@ fun _ ->
   x
 
 let iteri f m =
-  List.iteri (fun i row ->
-    List.iteri (fun j x ->
+  List.iteri (fun j row ->
+    List.iteri (fun i x ->
       f (i, j) x
     ) row
   ) m

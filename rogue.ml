@@ -38,15 +38,22 @@ let level : obj Matrix.t =
 let print = Matrix.print print_obj
 
 let parse_action = function
-  (*| 'h' -> `Go (-1,  0)*)
-  (*| 'j' -> `Go ( 0, +1)*)
-  (*| 'k' -> `Go ( 0, -1)*)
-  (*| 'l' -> `Go (+1,  0)*)
+  | 'h' -> `Move (-1,  0)
+  | 'j' -> `Move ( 0, +1)
+  | 'k' -> `Move ( 0, -1)
+  | 'l' -> `Move (+1,  0)
   | c -> `Invalid c
 
 let rec lwt_forever state f =
   let%lwt new_state = f state in
   lwt_forever new_state f
+
+type state =
+  { player_pos : int * int
+  ; matrix : obj Matrix.t
+  }
+
+let add_delta (x, y) (dx, dy) = (x+dx, y+dy)
 
 let interpret_action state = function
   | `Invalid c ->
@@ -54,11 +61,11 @@ let interpret_action state = function
         Printf.printf "Invalid command : '%c'\n%!" c;
         Lwt.return state
       end
-
-type state =
-  { player_pos : int * int
-  ; matrix : obj Matrix.t
-  }
+  | `Move delta ->
+      Lwt.return
+        { state with
+          player_pos = add_delta state.player_pos delta
+        }
 
 let display_state state =
   let matrix_with_player = Matrix.put state.matrix state.player_pos Player in
