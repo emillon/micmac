@@ -218,6 +218,10 @@ let rat pos =
   ; action = rat_action
   }
 
+let actor_alive state actor_to_check =
+  List.exists
+    (fun actor -> actor.id = actor_to_check.id)
+    state.actors
 
 let main () =
   let init_state =
@@ -234,7 +238,10 @@ let main () =
   lwt_forever init_state @@ fun state ->
     display_state state >>
     let go state actor =
-      actor.action actor state
+      if actor_alive state actor then
+        actor.action actor state
+      else
+        Lwt.return state
     in
     Lwt_list.fold_left_s go state state.actors
 
