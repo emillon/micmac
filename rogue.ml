@@ -55,30 +55,38 @@ type state =
   { player_pos : int * int
   ; matrix : obj Matrix.t
   ; rat_pos : int * int
+  ; rat_alive : bool
   }
 
 let add_delta (x, y) (dx, dy) = (x+dx, y+dy)
 
 let actors state =
-  [ (state.player_pos, Player)
-  ; (state.rat_pos, Rat)
-  ]
+  let rat =
+    if state.rat_alive then
+      [(state.rat_pos, Rat)]
+    else
+      []
+  in
+  [(state.player_pos, Player)]@rat
 
 let actor_at state pos =
-  List.exists
-    (fun (actor_pos, _) -> pos = actor_pos)
-    (actors state)
+  match List.assoc pos (actors state) with
+  | exception Not_found -> None
+  | actor -> Some actor
 
 let can_move state pos =
-  if actor_at state pos then
-    false
-  else
-    match Matrix.get state.matrix pos with
-    | Wall -> false
-    | Nothing -> true
-    | Player -> assert false
-    | Empty -> assert false
-    | Rat -> assert false
+  match actor_at state pos with
+  | Some actor ->
+    `Fight actor
+  | None ->
+      begin
+        match Matrix.get state.matrix pos with
+        | Wall -> `Bonk
+        | Nothing -> `Can_move
+        | Player -> assert false
+        | Empty -> assert false
+        | Rat -> assert false
+      end
 
 let msg fmt =
   let k s =
@@ -95,16 +103,25 @@ let interpret_action state = function
       end
   | `Move delta ->
       let player_pos = add_delta state.player_pos delta in
-      if can_move state player_pos then
-        Lwt.return
-          { state with
-            player_pos
-          }
-      else
+      match can_move state player_pos with
+      | `Can_move ->
+          Lwt.return
+            { state with
+              player_pos
+            }
+      | `Bonk ->
         begin
           msg "bonk" >>
           Lwt.return state
         end
+      | `Fight _ ->
+          begin
+            msg "The creature could not do anything" >>
+            Lwt.return
+              { state with
+                rat_alive = false
+              }
+          end
 
 let add_actors =
   let go m (pos, obj) =
@@ -133,6 +150,7 @@ let main () =
     { player_pos = (5, 5)
     ; matrix = level
     ; rat_pos = (7, 7)
+    ; rat_alive = true
     }
   in
   set_unbuffered ();
