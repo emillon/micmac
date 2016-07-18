@@ -1,6 +1,6 @@
 type 'state t =
   { id : int
-  ; pos : int * int
+  ; pos : Pos.t
   ; tile : Tile.t
   ; action : 'state action
   }
