@@ -2,4 +2,4 @@ true: annot
 true: package(lwt.unix)
 true: package(lwt.ppx)
 true: package(stringext)
-true: warn(@8)
+true: warn(@8@40)

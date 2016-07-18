@@ -1,26 +1,4 @@
-type obj =
-  | Player
-  | Nothing
-  | Wall
-  | Empty
-  | Rat
-
-let parse_obj = function
-  | '@' -> Some Player
-  | '.' -> Some Nothing
-  | '#' -> Some Wall
-  | ' ' -> Some Empty
-  | 'r' -> Some Rat
-  | _ -> None
-
-let print_obj = function
-  | Player -> '@'
-  | Nothing -> '.'
-  | Wall -> '#'
-  | Empty -> ' '
-  | Rat -> 'r'
-
-let level : obj Matrix.t =
+let level : Tile.t Matrix.t =
   let data =
     [ "####             "
     ; "#..#             "
@@ -34,11 +12,11 @@ let level : obj Matrix.t =
     ; "#################"
     ]
   in
-  match Matrix.parse parse_obj data with
+  match Matrix.parse Tile.parse data with
   | Ok x -> x
   | Error e -> failwith e
 
-let print = Matrix.print print_obj
+let print = Matrix.print Tile.print
 
 let parse_action = function
   | 'h' -> `Move (-1,  0)
@@ -58,12 +36,12 @@ let rec lwt_forever state f =
 type 'state actor =
   { id : int
   ; pos : int * int
-  ; obj : obj
+  ; tile : Tile.t
   ; action : 'state actor -> 'state -> 'state Lwt.t
   }
 
 type state =
-  { matrix : obj Matrix.t
+  { matrix : Tile.t Matrix.t
   ; actors : state actor list
   }
 
@@ -88,6 +66,7 @@ let actor_at state pos =
   first_matching p state.actors
 
 let can_move state pos =
+  let open Tile in
   match actor_at state pos with
   | Some actor ->
     `Fight actor
@@ -120,7 +99,7 @@ let kill_actor state actor =
 
 let player state =
   let p actor =
-    if actor.obj = Player then
+    if actor.tile = Tile.Player then
       Some actor
     else
       None
@@ -169,7 +148,7 @@ let interpret_action state = function
 
 let add_actors =
   let go m actor =
-    Matrix.put m actor.pos actor.obj
+    Matrix.put m actor.pos actor.tile
   in
   List.fold_left go
 
@@ -214,7 +193,7 @@ let rat_action actor state =
 let rat pos =
   { id = fresh ()
   ; pos
-  ; obj = Rat
+  ; tile = Tile.Rat
   ; action = rat_action
   }
 
@@ -227,7 +206,7 @@ let main () =
   let init_state =
     { matrix = level
     ; actors =
-      [ { id = fresh () ; pos = (5, 5) ; obj = Player ; action = player_action }
+      [ { id = fresh () ; pos = (5, 5) ; tile = Tile.Player ; action = player_action }
       ; rat (3, 5)
       ; rat (7, 7)
       ; rat (5, 7)
