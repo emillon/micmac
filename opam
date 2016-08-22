@@ -1,0 +1,15 @@
+opam-version: "1.2"
+maintainer: "Etienne Millon <me@emillon.org>"
+authors: "Etienne Millon <me@emillon.org>"
+homepage: "https://github.com/emillon/micmac"
+bug-reports: "https://github.com/emillon/micmac/issues"
+license: "BSD-2"
+dev-repo: "https://github.com/emillon/micmac.git"
+build: [make]
+depends: [
+  "lwt" { = "2.5.2" }
+  "ocamlbuild" {build}
+  "ocamlfind" {build}
+  "stringext" { = "1.4.2" }
+]
+available: [ocaml-version >= "4.02.2"]
