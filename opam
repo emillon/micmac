@@ -10,6 +10,7 @@ depends: [
   "lwt" { = "2.5.2" }
   "ocamlbuild" {build}
   "ocamlfind" {build}
+  "topkg" {build}
   "stringext" { = "1.4.2" }
 ]
 available: [ocaml-version >= "4.02.2"]

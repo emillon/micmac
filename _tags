@@ -1,4 +1,6 @@
 true: annot
+<bin>: include
+<src>: include
 true: package(lwt.unix)
 true: package(lwt.ppx)
 true: package(stringext)
